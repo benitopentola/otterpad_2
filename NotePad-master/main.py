@@ -3,10 +3,12 @@ import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 import os
 from PIL import Image, ImageTk
-from PIL import ImageTk
 from close import close_program
-import print
-from close import close_program
+from print import print_file
+from preferences import Preferences
+import tkinter as tk
+from tkinter import ttk
+from preferences import Preferences
 
 
 class Notepad:
@@ -21,11 +23,9 @@ class Notepad:
         scrollbar.pack(side='right', fill='y')
         self.text['yscrollcommand'] = scrollbar.set
 
-        # Creamos un menú de opciones
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
 
-        # Creamos un menú File (Archivo)
         file_menu = tk.Menu(menubar)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Save", command=self.save)
@@ -38,7 +38,6 @@ class Notepad:
         file_menu.add_command(label="Cerrar", command=close_program)
         file_menu.add_command(label="Print", command=lambda: print.print_file(notepad=self))
 
-        # Creamos un menú Edit (Editar)
         edit_menu = tk.Menu(menubar)
         menubar.add_cascade(label="Edit", menu=edit_menu)
         edit_menu.add_command(label="Search", command=self.search)
@@ -48,8 +47,17 @@ class Notepad:
         edit_menu.add_command(label="Convert to Lowercase", command=self.convert_to_lowercase)
         edit_menu.add_command(label="Select All", command=self.select_all)
 
+        preferences_menu = tk.Menu(menubar)
+        menubar.add_cascade(label="Help", menu=preferences_menu)
+        preferences_menu.add_command(label="Open Help", command=self.open_preferences)
+
+    def open_preferences(self):
+        preferences_window = tk.Toplevel(self.root)
+        preferences_window.title("Preferences")
+        preferences = Preferences(preferences_window)
+
     def rename_file(self):
-        current_file = self.current_file # aqui se obtiene la ruta
+        current_file = self.current_file
         if not current_file:
             return
 
@@ -72,7 +80,7 @@ class Notepad:
         if file_dialog:
             with open(file_dialog, "w") as file:
                 file.write(contents)
-            self.current_file = file_dialog  # almacenar la ruta del archivo actual
+            self.current_file = file_dialog
             self.root.title(os.path.basename(self.current_file) + " - Otterpad")
 
     def open(self):
@@ -114,7 +122,6 @@ class Notepad:
             if not term:
                 return
 
-            # Elimina la selección anterior, si la hay
             self.text.tag_remove("sel", "1.0", "end")
 
             start = "1.0"
@@ -127,10 +134,8 @@ class Notepad:
                 self.text.tag_add("sel", start, end)
                 self.text.see(start)
 
-                # Establecer el estilo del resaltado de la palabra
                 self.text.tag_configure("highlight", background="yellow")
 
-                # Aplicar el estilo de resaltado de la palabra
                 self.text.tag_add("highlight", start, end)
 
                 start = end
@@ -168,23 +173,23 @@ class Notepad:
         replace_button.pack()
 
     def convert_to_uppercase(self):
-        # Obtenemos el contenido actual de la caja de texto
+
         current_text = self.text.get("1.0", "end-1c")
-        # Convertimos el contenido a mayúsculas
+
         uppercase_text = current_text.upper()
-        # Eliminamos el contenido actual de la caja de texto
+
         self.text.delete("1.0", "end")
-        # Insertamos el contenido convertido a mayúsculas
+
         self.text.insert("1.0", uppercase_text)
 
     def convert_to_lowercase(self):
-        # Obtenemos el contenido actual de la caja de texto
+
         current_text = self.text.get("1.0", "end-1c")
-        # Convertimos el contenido a minúsculas
+
         lowercase_text = current_text.lower()
-        # Eliminamos el contenido actual de la caja de texto
+
         self.text.delete("1.0", "end")
-        # Insertamos el contenido convertido a minúsculas
+
         self.text.insert("1.0", lowercase_text)
 
     def save_as(self):
@@ -201,6 +206,30 @@ class Notepad:
     def select_all(self):
         self.text.tag_add("sel", "1.0", "end")
 
+
+class MainWindow:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Main Window")
+
+        # Botón para abrir la ventana de preferencias
+        preferences_button = tk.Button(self.root, text="Preferences", command=self.open_preferences)
+        preferences_button.pack()
+
+        # Etiqueta para mostrar el mensaje de confirmación de cambio de color
+        self.message_label = ttk.Label(self.root, text="")
+        self.message_label.pack(pady=10)
+
+    def open_preferences(self):
+        preferences_window = tk.Toplevel(self.root)
+        Preferences(preferences_window, self.root, self.update_background_color)
+
+    def update_background_color(self, color):
+        # Configura el color de fondo de la ventana principal con el color seleccionado en la ventana de preferencias
+        self.root.configure(background=color)
+
+        # Actualiza la etiqueta de mensaje con el mensaje de confirmación
+        self.message_label.configure(text="Color de fondo cambiado a {}".format(color))
 def main():
     root = tk.Tk()
     root.geometry("800x600")
