@@ -1,0 +1,10 @@
+import os
+import tkinter.filedialog as filedialog
+
+def rename_file(current_file):
+    new_name = filedialog.asksaveasfilename(initialfile=os.path.basename(current_file), defaultextension=".txt")
+    if not new_name:
+        return
+
+    os.rename(current_file, new_name)
+    return new_name
