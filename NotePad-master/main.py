@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 from PIL import ImageTk
 from close import close_program
 import print
+from close import close_program
 
 
 class Notepad:
