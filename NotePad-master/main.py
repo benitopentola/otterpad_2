@@ -4,11 +4,17 @@ import tkinter.messagebox as messagebox
 import os
 from PIL import Image, ImageTk
 from close import close_program
+import tkinter.simpledialog as simpledialog
 from print import print_file
 from preferences import Preferences
+import os
+import shutil
 import tkinter as tk
 from tkinter import ttk
 from preferences import Preferences
+import tkinter.filedialog as filedialog
+import subprocess
+
 
 
 class Notepad:
@@ -16,7 +22,7 @@ class Notepad:
         self.root = root
         self.root.title("Otterpad")
         self.current_file = None
-        self.text = tk.Text(self.root, font=("Arial", 12))
+        self.text = tk.Text(self.root, font=("Arial", 12), undo=True, wrap='word')
         self.text.pack(expand=True, fill='both')
 
         scrollbar = tk.Scrollbar(self.root, command=self.text.yview)
@@ -37,51 +43,45 @@ class Notepad:
         file_menu.add_command(label="Rename", command=self.rename_file)
         file_menu.add_command(label="Cerrar", command=close_program)
         file_menu.add_command(label="Print", command=lambda: print.print_file(notepad=self))
+        file_menu.add_separator()
+        file_menu.add_command(label="Close", command=self.root.destroy)
+        file_menu.add_command(label="Exit", command=self.root.quit)
 
         edit_menu = tk.Menu(menubar)
         menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Undo", command=self.text.edit_undo)
+        edit_menu.add_command(label="Redo", command=self.text.edit_redo)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Cut", command=self.cut)
+        edit_menu.add_command(label="Copy", command=self.copy)
+        edit_menu.add_command(label="Paste", command=self.paste)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Select All", command=self.select_all)
+        edit_menu.add_command(label="Deselect All", command=self.deselect_all)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Go to Line", command=self.goto_line)
+        edit_menu.add_command(label="Word Count", command=self.word_count)
+        edit_menu.add_command(label="Character Count", command=self.character_count)
+        edit_menu.add_separator()
         edit_menu.add_command(label="Search", command=self.search)
         edit_menu.add_command(label="Replace", command=self.replace)
         edit_menu.add_separator()
         edit_menu.add_command(label="Convert to Uppercase", command=self.convert_to_uppercase)
         edit_menu.add_command(label="Convert to Lowercase", command=self.convert_to_lowercase)
-        edit_menu.add_command(label="Select All", command=self.select_all)
+        edit_menu.add_command(label="Invert Case", command=self.invert_case)
+        edit_menu.add_command(label="Title Case", command=self.title_case)
+        edit_menu.add_command(label="Sentence Case", command=self.sentence_case)
 
-        preferences_menu = tk.Menu(menubar)
-        menubar.add_cascade(label="Help", menu=preferences_menu)
-        preferences_menu.add_command(label="Open Help", command=self.open_preferences)
-
-    def open_preferences(self):
-        preferences_window = tk.Toplevel(self.root)
-        preferences_window.title("Preferences")
-        preferences = Preferences(preferences_window)
-
-    def rename_file(self):
-        current_file = self.current_file
-        if not current_file:
-            return
-
-        new_name = filedialog.asksaveasfilename(initialfile=os.path.basename(current_file), defaultextension=".txt")
-        if not new_name:
-            return
-
-        os.rename(current_file, new_name)
-        self.current_file = new_name
-        self.root.title(os.path.basename(new_name) + " - Otterpad")
-
-    def get_current_file(self):
-        current_file = self.root.title().split(" - ")[0]
-        return current_file
+    def select_all(self):
+        self.text.tag_add("sel", "1.0", "end")
 
     def save(self):
-        contents = self.text.get("1.0", "end-1c")
-
-        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt")
-        if file_dialog:
-            with open(file_dialog, "w") as file:
+        if self.current_file:
+            contents = self.text.get("1.0", "end-1c")
+            with open(self.current_file, "w") as file:
                 file.write(contents)
-            self.current_file = file_dialog
-            self.root.title(os.path.basename(self.current_file) + " - Otterpad")
+        else:
+            self.save_as()
 
     def open(self):
         file_dialog = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
@@ -91,145 +91,133 @@ class Notepad:
 
             self.text.delete("1.0", "end")
             self.text.insert("1.0", contents)
+            self.current_file = file_dialog
+            self.root.title(os.path.basename(self.current_file) + " - Otterpad")
 
     def create_new_file(self):
-        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt")
-        if file_dialog:
-            with open(file_dialog, "w") as file:
-                file.write("")
-
-    def open_containing_folder(self):
-        file_path = filedialog.askopenfilename()
-        if file_path:
-            folder_path = os.path.dirname(file_path)
-            os.startfile(folder_path)
-
-    def open_in_notepad(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
-        if file_path:
-            os.startfile(file_path)
+        self.text.delete("1.0", "end")
+        self.current_file = None
+        self.root.title("Untitled - Otterpad")
 
     def search(self):
-        search_window = tk.Toplevel(self.root)
-        search_window.title("Search")
-
-        tk.Label(search_window, text="Search term:").pack()
-        search_term = tk.Entry(search_window)
-        search_term.pack()
-
-        def do_search():
-            term = search_term.get()
-            if not term:
-                return
-
-            self.text.tag_remove("sel", "1.0", "end")
-
-            start = "1.0"
-            while True:
-                start = self.text.search(term, index=start, stopindex="end")
-                if not start:
-                    break
-
-                end = f"{start}+{len(term)}c"
-                self.text.tag_add("sel", start, end)
-                self.text.see(start)
-
-                self.text.tag_configure("highlight", background="yellow")
-
-                self.text.tag_add("highlight", start, end)
-
-                start = end
-
-        search_button = tk.Button(search_window, text="Search", command=do_search)
-        search_button.pack()
-
-    def replace(self):
-        replace_window = tk.Toplevel(self.root)
-        replace_window.title("Replace")
-
-        tk.Label(replace_window, text="Search term:").pack()
-        search_term = tk.Entry(replace_window)
-        search_term.pack()
-
-        tk.Label(replace_window, text="Replace term:").pack()
-        replace_term = tk.Entry(replace_window)
-        replace_term.pack()
-
-        def do_replace():
-            search = search_term.get()
-            replace = replace_term.get()
-
-            start = "1.0"
-            while True:
-                start = self.text.search(search, start, stopindex="end")
-                if not start:
-                    break
-
-                end = self.text.index(f"{start}+{len(search)}c")
-                self.text.delete(start, end)
-                self.text.insert(start, replace)
-
-        replace_button = tk.Button(replace_window, text="Replace", command=do_replace)
-        replace_button.pack()
-
+        search_term = simpledialog.askstring("Search", "Enter text to search:")
+        if search_term:
+            index = self.text.search(search_term, "1.0", stopindex="end")
+            if index != "":
+                line, col = index.split(".")
+                self.text.tag_configure("search", background="yellow")
+                self.text.tag_add("search", index, f"{index}+{len(search_term)}c")
+                self.text.mark_set("insert", f"{index}+{len(search_term)}c")
+                self.text.see(index)
+            else:
+                messagebox.showinfo("Search", "Text not found")
     def convert_to_uppercase(self):
-
-        current_text = self.text.get("1.0", "end-1c")
-
-        uppercase_text = current_text.upper()
-
+        content = self.text.get("1.0", "end-1c")
+        upper_content = content.upper()
         self.text.delete("1.0", "end")
-
-        self.text.insert("1.0", uppercase_text)
+        self.text.insert("1.0", upper_content)
 
     def convert_to_lowercase(self):
-
-        current_text = self.text.get("1.0", "end-1c")
-
-        lowercase_text = current_text.lower()
-
+        content = self.text.get("1.0", "end-1c")
+        lower_content = content.lower()
         self.text.delete("1.0", "end")
+        self.text.insert("1.0", lower_content)
 
-        self.text.insert("1.0", lowercase_text)
+    def replace(self):
+        find_text = simpledialog.askstring("Replace", "Find text:")
+        if find_text:
+            replace_text = simpledialog.askstring("Replace", "Replace with:")
+            if replace_text is not None:
+                content = self.text.get("1.0", "end-1c")
+                replaced_content = content.replace(find_text, replace_text)
+                self.text.delete("1.0", "end")
+                self.text.insert("1.0", replaced_content)
+    def cut(self):
+        self.text.event_generate("<<Cut>>")
+
+    def copy(self):
+        self.text.event_generate("<<Copy>>")
+
+    def paste(self):
+        self.text.event_generate("<<Paste>>")
+
+    def deselect_all(self):
+        self.text.tag_remove("sel", "1.0", "end")
+
+    def goto_line(self):
+        line_number = simpledialog.askinteger("Go to Line", "Enter line number:")
+        if line_number is not None:
+            self.text.mark_set("insert", f"{line_number}.0")
+            self.text.see("insert")
+
+    def word_count(self):
+        content = self.text.get("1.0", "end-1c")
+        words = len(content.split())
+        messagebox.showinfo("Word Count", f"Words: {words}")
+
+    def character_count(self):
+        content = self.text.get("1.0", "end-1c")
+        chars = len(content)
+        messagebox.showinfo("Character Count", f"Characters: {chars}")
+
+    def invert_case(self):
+        content = self.text.get("1.0", "end-1c")
+        inverted_content = content.swapcase()
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", inverted_content)
+
+    def title_case(self):
+        content = self.text.get("1.0", "end-1c")
+        title_content = content.title()
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", title_content)
+
+    def sentence_case(self):
+        content = self.text.get("1.0", "end-1c")
+        sentence_content = content.capitalize()
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", sentence_content)
+
+
+    def open_containing_folder(self):
+        if self.current_file:
+            folder_path = os.path.dirname(os.path.abspath(self.current_file))
+            if os.name == 'nt':  # Si es Windows
+                subprocess.Popen(f'explorer "{folder_path}"')
+            elif os.name == 'posix':  # Si es macOS o Linux
+                subprocess.Popen(['open', folder_path])
+        else:
+            messagebox.showerror("Error", "No hay archivo abierto para mostrar su directorio.")
+    def open_in_notepad(self):
+        if self.current_file:
+            if os.name == 'nt':  # Si es Windows
+                subprocess.Popen(['notepad.exe', self.current_file])
+            else:
+                messagebox.showerror("Error", "Esta función solo está disponible en Windows.")
+        else:
+            messagebox.showerror("Error", "No hay archivo abierto para abrir en Notepad.")
 
     def save_as(self):
-        # Obtener el contenido del editor
-        contents = self.text.get("1.0", "end-1c")
-
-        # Abrir un cuadro de diálogo para seleccionar el nombre y la ubicación de la copia
-        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt")
-
+        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
         if file_dialog:
+            contents = self.text.get("1.0", "end-1c")
             with open(file_dialog, "w") as file:
                 file.write(contents)
 
-    def select_all(self):
-        self.text.tag_add("sel", "1.0", "end")
+            self.current_file = file_dialog
+            self.root.title(os.path.basename(self.current_file) + " - Otterpad")
 
+    def rename_file(self):
+        if self.current_file:
+            file_directory, old_filename = os.path.split(self.current_file)
+            new_filename = filedialog.asksaveasfilename(initialdir=file_directory, initialfile=old_filename, defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+            if new_filename:
+                shutil.move(self.current_file, new_filename)
+                self.current_file = new_filename
+                self.root.title(os.path.basename(self.current_file) + " - Otterpad")
+        else:
+            messagebox.showerror("Error")
 
-class MainWindow:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Main Window")
-
-        # Botón para abrir la ventana de preferencias
-        preferences_button = tk.Button(self.root, text="Preferences", command=self.open_preferences)
-        preferences_button.pack()
-
-        # Etiqueta para mostrar el mensaje de confirmación de cambio de color
-        self.message_label = ttk.Label(self.root, text="")
-        self.message_label.pack(pady=10)
-
-    def open_preferences(self):
-        preferences_window = tk.Toplevel(self.root)
-        Preferences(preferences_window, self.root, self.update_background_color)
-
-    def update_background_color(self, color):
-        # Configura el color de fondo de la ventana principal con el color seleccionado en la ventana de preferencias
-        self.root.configure(background=color)
-
-        # Actualiza la etiqueta de mensaje con el mensaje de confirmación
-        self.message_label.configure(text="Color de fondo cambiado a {}".format(color))
 def main():
     root = tk.Tk()
     root.geometry("800x600")
@@ -248,3 +236,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
