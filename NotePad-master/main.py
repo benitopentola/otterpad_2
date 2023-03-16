@@ -3,25 +3,15 @@ import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 import os
 from PIL import Image, ImageTk
-from close import close_program
 import tkinter.simpledialog as simpledialog
-from print import print_file
-from preferences import Preferences
-import os
-import shutil
-import tkinter as tk
-from tkinter import ttk
-from preferences import Preferences
-import tkinter.filedialog as filedialog
 import subprocess
-
-
+import sqlite3
 
 class Notepad:
     def __init__(self, root):
         self.root = root
         self.root.title("Otterpad")
-        self.current_file = None
+        self.current_file_path = None
         self.text = tk.Text(self.root, font=("Arial", 12), undo=True, wrap='word')
         self.text.pack(expand=True, fill='both')
 
@@ -40,9 +30,6 @@ class Notepad:
         file_menu.add_command(label="Open containing folder", command=self.open_containing_folder)
         file_menu.add_command(label="Open in Notepad", command=self.open_in_notepad)
         file_menu.add_command(label="Save As", command=self.save_as)
-        file_menu.add_command(label="Rename", command=self.rename_file)
-        file_menu.add_command(label="Cerrar", command=close_program)
-        file_menu.add_command(label="Print", command=lambda: print.print_file(notepad=self))
         file_menu.add_separator()
         file_menu.add_command(label="Close", command=self.root.destroy)
         file_menu.add_command(label="Exit", command=self.root.quit)
@@ -72,66 +59,54 @@ class Notepad:
         edit_menu.add_command(label="Title Case", command=self.title_case)
         edit_menu.add_command(label="Sentence Case", command=self.sentence_case)
 
+    def sentence_case(self):
+        content = self.text.get("1.0", "end-1c")
+        sentence_content = '. '.join([i.capitalize() for i in content.split('. ')])
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", sentence_content)
+
     def select_all(self):
         self.text.tag_add("sel", "1.0", "end")
 
     def save(self):
-        if self.current_file:
+        if self.current_file_path:
             contents = self.text.get("1.0", "end-1c")
-            with open(self.current_file, "w") as file:
+            with open(self.current_file_path, 'w') as file:
                 file.write(contents)
         else:
             self.save_as()
 
     def open(self):
-        file_dialog = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        file_dialog = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
         if file_dialog:
-            with open(file_dialog, "r") as file:
+            self.current_file_path = file_dialog
+            with open(file_dialog, 'r') as file:
                 contents = file.read()
-
             self.text.delete("1.0", "end")
             self.text.insert("1.0", contents)
-            self.current_file = file_dialog
-            self.root.title(os.path.basename(self.current_file) + " - Otterpad")
+            self.root.title(f"Otterpad - {os.path.basename(self.current_file_path)}")
 
     def create_new_file(self):
+        self.current_file_path = None
         self.text.delete("1.0", "end")
-        self.current_file = None
-        self.root.title("Untitled - Otterpad")
+        self.root.title("Otterpad")
 
-    def search(self):
-        search_term = simpledialog.askstring("Search", "Enter text to search:")
-        if search_term:
-            index = self.text.search(search_term, "1.0", stopindex="end")
-            if index != "":
-                line, col = index.split(".")
-                self.text.tag_configure("search", background="yellow")
-                self.text.tag_add("search", index, f"{index}+{len(search_term)}c")
-                self.text.mark_set("insert", f"{index}+{len(search_term)}c")
-                self.text.see(index)
-            else:
-                messagebox.showinfo("Search", "Text not found")
-    def convert_to_uppercase(self):
-        content = self.text.get("1.0", "end-1c")
-        upper_content = content.upper()
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", upper_content)
+    def open_containing_folder(self):
+        if self.current_file_path:
+            folder = os.path.dirname(self.current_file_path)
+            subprocess.run(['explorer', folder])
 
-    def convert_to_lowercase(self):
-        content = self.text.get("1.0", "end-1c")
-        lower_content = content.lower()
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", lower_content)
+    def open_in_notepad(self):
+        if self.current_file_path:
+            subprocess.run(['notepad', self.current_file_path])
 
-    def replace(self):
-        find_text = simpledialog.askstring("Replace", "Find text:")
-        if find_text:
-            replace_text = simpledialog.askstring("Replace", "Replace with:")
-            if replace_text is not None:
-                content = self.text.get("1.0", "end-1c")
-                replaced_content = content.replace(find_text, replace_text)
-                self.text.delete("1.0", "end")
-                self.text.insert("1.0", replaced_content)
+    def save_as(self):
+        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
+        if file_dialog:
+            self.current_file_path = file_dialog
+            self.save()
+            self.root.title(f"Otterpad - {os.path.basename(self.current_file_path)}")
+
     def cut(self):
         self.text.event_generate("<<Cut>>")
 
@@ -145,10 +120,9 @@ class Notepad:
         self.text.tag_remove("sel", "1.0", "end")
 
     def goto_line(self):
-        line_number = simpledialog.askinteger("Go to Line", "Enter line number:")
-        if line_number is not None:
+        line_number = simpledialog.askinteger("Goto Line", "Enter line number:", parent=self.root, minvalue=1)
+        if line_number:
             self.text.mark_set("insert", f"{line_number}.0")
-            self.text.see("insert")
 
     def word_count(self):
         content = self.text.get("1.0", "end-1c")
@@ -157,83 +131,79 @@ class Notepad:
 
     def character_count(self):
         content = self.text.get("1.0", "end-1c")
-        chars = len(content)
-        messagebox.showinfo("Character Count", f"Characters: {chars}")
+        characters = len(content)
+        messagebox.showinfo("Character Count", f"Characters: {characters}")
+
+    def search(self):
+        pass
+
+    def replace(self):
+        pass
+
+    def convert_to_uppercase(self):
+        content = self.text.get("1.0", "end-1c")
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", content.upper())
+
+    def convert_to_lowercase(self):
+        content = self.text.get("1.0", "end-1c")
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", content.lower())
 
     def invert_case(self):
         content = self.text.get("1.0", "end-1c")
-        inverted_content = content.swapcase()
         self.text.delete("1.0", "end")
-        self.text.insert("1.0", inverted_content)
+        self.text.insert("1.0", content.swapcase())
 
     def title_case(self):
         content = self.text.get("1.0", "end-1c")
-        title_content = content.title()
         self.text.delete("1.0", "end")
-        self.text.insert("1.0", title_content)
+        self.text.insert("1.0", content.title())
 
-    def sentence_case(self):
-        content = self.text.get("1.0", "end-1c")
-        sentence_content = content.capitalize()
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", sentence_content)
+        def sentence_case(self):
+            content = self.text.get("1.0", "end-1c")
+            sentences = content.split('. ')
+            sentence_cased = '. '.join([s.capitalize() for s in sentences])
+            self.text.delete("1.0", "end")
+            self.text.insert("1.0", sentence_cased)
 
+        def search(self):
+            search_query = simpledialog.askstring("Search", "Enter search query:", parent=self.root)
+            if search_query:
+                start = self.text.search(search_query, "1.0", stopindex="end")
+                if start:
+                    end = f"{start.split('.')[0]}.{int(start.split('.')[1]) + len(search_query)}"
+                    self.text.tag_add("highlight", start, end)
+                    self.text.tag_configure("highlight", background="yellow", foreground="black")
+                    self.text.mark_set("insert", end)
+                else:
+                    messagebox.showinfo("Search", f"'{search_query}' not found.")
 
-    def open_containing_folder(self):
-        if self.current_file:
-            folder_path = os.path.dirname(os.path.abspath(self.current_file))
-            if os.name == 'nt':  # Si es Windows
-                subprocess.Popen(f'explorer "{folder_path}"')
-            elif os.name == 'posix':  # Si es macOS o Linux
-                subprocess.Popen(['open', folder_path])
-        else:
-            messagebox.showerror("Error", "No hay archivo abierto para mostrar su directorio.")
-    def open_in_notepad(self):
-        if self.current_file:
-            if os.name == 'nt':  # Si es Windows
-                subprocess.Popen(['notepad.exe', self.current_file])
-            else:
-                messagebox.showerror("Error", "Esta función solo está disponible en Windows.")
-        else:
-            messagebox.showerror("Error", "No hay archivo abierto para abrir en Notepad.")
+        def replace(self):
+            replace_dialog = tk.Toplevel(self.root)
+            replace_dialog.title("Replace")
+            tk.Label(replace_dialog, text="Find:").grid(row=0, column=0, sticky='e')
+            tk.Label(replace_dialog, text="Replace:").grid(row=1, column=0, sticky='e')
 
-    def save_as(self):
-        file_dialog = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
-        if file_dialog:
-            contents = self.text.get("1.0", "end-1c")
-            with open(file_dialog, "w") as file:
-                file.write(contents)
+            find_entry = tk.Entry(replace_dialog)
+            replace_entry = tk.Entry(replace_dialog)
+            find_entry.grid(row=0, column=1, padx=2, pady=2, sticky='we')
+            replace_entry.grid(row=1, column=1, padx=2, pady=2, sticky='we')
 
-            self.current_file = file_dialog
-            self.root.title(os.path.basename(self.current_file) + " - Otterpad")
+            def find_and_replace():
+                find_text = find_entry.get()
+                replace_text = replace_entry.get()
+                content = self.text.get("1.0", "end-1c")
+                new_content = content.replace(find_text, replace_text)
+                self.text.delete("1.0", "end")
+                self.text.insert("1.0", new_content)
 
-    def rename_file(self):
-        if self.current_file:
-            file_directory, old_filename = os.path.split(self.current_file)
-            new_filename = filedialog.asksaveasfilename(initialdir=file_directory, initialfile=old_filename, defaultextension=".txt", filetypes=[("Text files", "*.txt")])
-            if new_filename:
-                shutil.move(self.current_file, new_filename)
-                self.current_file = new_filename
-                self.root.title(os.path.basename(self.current_file) + " - Otterpad")
-        else:
-            messagebox.showerror("Error")
-
-def main():
-    root = tk.Tk()
-    root.geometry("800x600")
-
-    icon_path = os.path.join("imagenes", "iconoblockdenotas.ico")
-
-    icon_image = Image.open(icon_path)
-    icon_image = icon_image.resize((32, 32), Image.LANCZOS)
-    icon = ImageTk.PhotoImage(icon_image)
-    root.call('wm', 'iconphoto', root._w, icon)
-
-    root.title("Otterpad")
-
-    notepad = Notepad(root)
-    root.mainloop()
+            tk.Button(replace_dialog, text="Replace All", command=find_and_replace).grid(row=2, column=1, sticky='e',
+                                                                                         padx=2, pady=2)
+            replace_dialog.mainloop()
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    notepad = Notepad(root)
+    root.mainloop()
 
