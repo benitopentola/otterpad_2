@@ -38,7 +38,7 @@ class Notepad:
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Save", command=self.save)
         file_menu.add_command(label="Open", command=self.open)
-        file_menu.add_command(label="New", command=self.create_new_file)
+        file_menu.add_command(label="New", command=self.new_file)
         file_menu.add_command(label="Open containing folder", command=self.open_containing_folder)
         file_menu.add_command(label="Open in Notepad", command=self.open_in_notepad)
         file_menu.add_command(label="Save As", command=self.save_as)
@@ -71,32 +71,33 @@ class Notepad:
         edit_menu.add_command(label="Title Case", command=self.title_case)
         edit_menu.add_command(label="Sentence Case", command=self.sentence_case)
 
-        def new_file(self, _=None):
-            if not self.first_time:
-                open_in_new_tab = messagebox.askyesno("New File", "Do you want to create a new tab?")
-            else:
-                open_in_new_tab = False
-                self.first_time = False
+    def new_file(self, _=None):
+        if not self.first_time:
+            open_in_new_tab = messagebox.askyesno("New File", "Do you want to create a new tab?")
+        else:
+            open_in_new_tab = False
+            self.first_time = False
 
-            if open_in_new_tab:
-                # Crea una nueva pestaña en la ventana actual
-                file_frame = ttk.Frame(self.notebook)
-                self.notebook.add(file_frame, text='Untitled')
-                text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
-                text_widget.pack(expand=True, fill='both')
-                self.notebook.select(file_frame)
-            else:
-                # Cierra el archivo actual y abre uno nuevo en la misma pestaña
-                current_tab = self.notebook.index(self.notebook.select())
+        if open_in_new_tab:
+            # Crea una nueva pestaña en la ventana actual
+            file_frame = ttk.Frame(self.notebook)
+            self.notebook.add(file_frame, text='Untitled')
+            text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
+            text_widget.pack(expand=True, fill='both')
+            self.notebook.select(file_frame)
+        else:
+            # Cierra el archivo actual y abre uno nuevo en la misma pestaña
+            current_tab = self.notebook.select()
+            if current_tab:
                 self.notebook.forget(current_tab)
 
-                file_frame = ttk.Frame(self.notebook)
-                self.notebook.add(file_frame, text='Untitled')
-                text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
-                text_widget.pack(expand=True, fill='both')
-                self.notebook.select(file_frame)
+            file_frame = ttk.Frame(self.notebook)
+            self.notebook.add(file_frame, text='Untitled')
+            text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
+            text_widget.pack(expand=True, fill='both')
+            self.notebook.select(file_frame)
 
-            self.notebook.bind("<Control-n>", self.new_file)
+        self.notebook.bind("<Control-n>", self.new_file)
 
     def autosave_file(self, text_widget):
         downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
