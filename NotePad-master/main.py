@@ -6,14 +6,26 @@ from PIL import Image, ImageTk
 import tkinter.simpledialog as simpledialog
 import subprocess
 import sqlite3
+from tkinter import ttk
+import tkinter as tk
+from tkinter import filedialog
+import sqlite3
+import os
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
 
 class Notepad:
     def __init__(self, root):
         self.root = root
         self.root.title("Otterpad")
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(expand=True, fill='both')
+        self.first_time = True
+        self.new_file()
         self.current_file_path = None
         self.text = tk.Text(self.root, font=("Arial", 12), undo=True, wrap='word')
-        self.text.pack(expand=True, fill='both')
+        self.autosave()
 
         scrollbar = tk.Scrollbar(self.root, command=self.text.yview)
         scrollbar.pack(side='right', fill='y')
@@ -59,6 +71,58 @@ class Notepad:
         edit_menu.add_command(label="Title Case", command=self.title_case)
         edit_menu.add_command(label="Sentence Case", command=self.sentence_case)
 
+        def new_file(self, _=None):
+            if not self.first_time:
+                open_in_new_tab = messagebox.askyesno("New File", "Do you want to create a new tab?")
+            else:
+                open_in_new_tab = False
+                self.first_time = False
+
+            if open_in_new_tab:
+                # Crea una nueva pestaña en la ventana actual
+                file_frame = ttk.Frame(self.notebook)
+                self.notebook.add(file_frame, text='Untitled')
+                text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
+                text_widget.pack(expand=True, fill='both')
+                self.notebook.select(file_frame)
+            else:
+                # Cierra el archivo actual y abre uno nuevo en la misma pestaña
+                current_tab = self.notebook.index(self.notebook.select())
+                self.notebook.forget(current_tab)
+
+                file_frame = ttk.Frame(self.notebook)
+                self.notebook.add(file_frame, text='Untitled')
+                text_widget = tk.Text(file_frame, font=("Arial", 12), undo=True, wrap='word')
+                text_widget.pack(expand=True, fill='both')
+                self.notebook.select(file_frame)
+
+            self.notebook.bind("<Control-n>", self.new_file)
+
+    def autosave_file(self, text_widget):
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_name = "file"
+        file_number = 0
+
+        while True:
+            if file_number == 0:
+                file_path = os.path.join(downloads_folder, f"{file_name}.txt")
+            else:
+                file_path = os.path.join(downloads_folder, f"{file_name}_{file_number}.txt")
+
+            if not os.path.exists(file_path):
+                with open(file_path, "w") as file:
+                    file.write(text_widget.get(1.0, tk.END))
+                break
+            else:
+                file_number += 1
+
+    def autosave(self, interval=60000):  # Intervalo en milisegundos, 60000 ms = 1 minuto
+        current_tab = self.notebook.index(self.notebook.select())
+        text_widget = self.notebook.nametowidget(self.notebook.select())
+
+        self.autosave_file(text_widget)
+        self.root.after(interval, self.autosave, interval)
+
     def sentence_case(self):
         content = self.text.get("1.0", "end-1c")
         sentence_content = '. '.join([i.capitalize() for i in content.split('. ')])
@@ -90,6 +154,13 @@ class Notepad:
         self.current_file_path = None
         self.text.delete("1.0", "end")
         self.root.title("Otterpad")
+
+    def autosave(self, interval=60000):
+        current_tab = self.notebook.index(self.notebook.select())
+        file_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab])
+        text_widget = file_frame.winfo_children()[0]
+        self.autosave_file(text_widget)
+        self.root.after(interval, self.autosave, interval)
 
     def open_containing_folder(self):
         if self.current_file_path:
