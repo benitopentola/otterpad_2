@@ -135,9 +135,14 @@ class Notepad:
 
     def save(self):
         if self.current_file_path:
-            contents = self.text.get("1.0", "end-1c")
+            current_tab = self.notebook.index(self.notebook.select())
+            file_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab])
+            text_widget = file_frame.winfo_children()[0]
+
+            contents = text_widget.get("1.0", "end-1c")
             with open(self.current_file_path, 'w') as file:
                 file.write(contents)
+
         else:
             self.save_as()
 
@@ -147,9 +152,13 @@ class Notepad:
             self.current_file_path = file_dialog
             with open(file_dialog, 'r') as file:
                 contents = file.read()
-            self.text.delete("1.0", "end")
-            self.text.insert("1.0", contents)
-            self.root.title(f"Otterpad - {os.path.basename(self.current_file_path)}")
+            current_tab = self.notebook.index(self.notebook.select())
+            file_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab])
+            text_widget = file_frame.winfo_children()[0]
+
+            text_widget.delete("1.0", "end")
+            text_widget.insert("1.0", contents)
+            self.notebook.tab(file_frame, text=os.path.basename(self.current_file_path))
 
     def create_new_file(self):
         self.current_file_path = None
